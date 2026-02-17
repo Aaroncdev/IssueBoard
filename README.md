@@ -8,6 +8,8 @@ A lightweight internal web app for posting and tracking ICT known issues as card
 - Authorized users (`author`/`admin`) can post issues, tag, prioritize, and close them.
 - All authenticated users can comment on issues; comments are attributed to the signed-in account.
 - Cards display creator, created date, tags, status, new/high-importance flags.
+- Optional expected resolution date per issue; overdue open issues are automatically treated as high importance.
+- Admin backend supports logo upload and theme color customization.
 - Admin backend for metadata edits, status control, and manual sort order.
 
 ## Quick start
@@ -38,6 +40,7 @@ Recommended pattern is IIS reverse proxy to Node.js using URL Rewrite + ARR:
 4. Configure rewrite rule to proxy all traffic to `http://localhost:3000`.
 5. Ensure headers forwarded: `X-Forwarded-Proto=https`.
 6. Set app env vars in system/user environment and restart service.
+7. Theme colors/logo are managed in-app from Admin backend and persisted in `data/issueboard.json`.
 
 ### Sample `web.config`
 ```xml

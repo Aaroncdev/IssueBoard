@@ -1,16 +1,18 @@
-:root{font-family:Arial,sans-serif;color-scheme:light}
-body{margin:0;background:#f4f6f9}
-header{display:flex;justify-content:space-between;align-items:center;padding:1rem 1.5rem;background:#1f4a78;color:#fff}
-header a{color:#fff;text-decoration:none}
+:root{font-family:Arial,sans-serif;color-scheme:light;--header-bg:#1f4a78;--page-bg:#f4f6f9;--accent:#1f4a78}
+body{margin:0;background:var(--page-bg)}
+header{display:flex;justify-content:space-between;align-items:center;padding:1rem 1.5rem;background:var(--header-bg);color:#fff}
+header a{color:#fff;text-decoration:none;display:flex;align-items:center;gap:.5rem}
+.logo{height:34px;max-width:140px;object-fit:contain;background:#fff;border-radius:4px;padding:2px}
 main{max-width:1100px;margin:1rem auto;padding:0 1rem}
 .panel,.card{background:#fff;border-radius:8px;padding:1rem;margin:.75rem 0;box-shadow:0 1px 4px rgba(0,0,0,.08)}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:.75rem}
 .card.high{border-left:5px solid #c0392b}
 .meta{display:flex;flex-wrap:wrap;gap:.35rem;font-size:.85rem;color:#555}
 .badge,.tag{border-radius:999px;padding:.2rem .5rem;font-size:.75rem}
-.badge.new{background:#d9f7be}.badge.high{background:#ffd6d6}.tag{background:#e8eef9}
+.badge.new{background:#d9f7be}.badge.high{background:#ffd6d6}.badge.overdue{background:#ffd1a8}.tag{background:#e8eef9}
 label{display:block;margin:.4rem 0}
 input,textarea,select,button{width:100%;padding:.45rem;margin-top:.2rem;box-sizing:border-box}
-button,.btn{background:#1f4a78;color:#fff;border:0;padding:.55rem .8rem;border-radius:6px;cursor:pointer;display:inline-block;width:auto}
+button,.btn{background:var(--accent);color:#fff;border:0;padding:.55rem .8rem;border-radius:6px;cursor:pointer;display:inline-block;width:auto}
 .comment{border-top:1px solid #eee;padding:.5rem 0}
 .error{color:#b00020}
+.create-issue summary{cursor:pointer;font-weight:700}

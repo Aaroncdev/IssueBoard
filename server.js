@@ -40,12 +40,53 @@ function sendHtml(res, html, status = 200) {
   res.end(html);
 }
 
-async function readBody(req) {
+async function readRawBody(req) {
   const chunks = [];
   for await (const chunk of req) chunks.push(chunk);
-  const raw = Buffer.concat(chunks).toString('utf8');
+  return Buffer.concat(chunks);
+}
+
+async function readBody(req) {
+  const raw = (await readRawBody(req)).toString('utf8');
   const entries = new URLSearchParams(raw);
   return Object.fromEntries(entries.entries());
+}
+
+async function readMultipart(req) {
+  const contentType = req.headers['content-type'] || '';
+  const match = contentType.match(/boundary=(.+)$/);
+  if (!match) return { fields: {}, files: {} };
+
+  const boundary = `--${match[1]}`;
+  const raw = (await readRawBody(req)).toString('binary');
+  const parts = raw.split(boundary).slice(1, -1);
+  const fields = {};
+  const files = {};
+
+  for (const part of parts) {
+    const cleaned = part.replace(/^\r\n/, '').replace(/\r\n$/, '');
+    const [headerBlock, bodyBlock] = cleaned.split('\r\n\r\n');
+    if (!headerBlock || bodyBlock === undefined) continue;
+
+    const nameMatch = headerBlock.match(/name="([^"]+)"/);
+    if (!nameMatch) continue;
+    const name = nameMatch[1];
+    const fileNameMatch = headerBlock.match(/filename="([^"]*)"/);
+
+    if (fileNameMatch && fileNameMatch[1]) {
+      const mimeMatch = headerBlock.match(/Content-Type:\s*([^\r\n]+)/i);
+      const dataBinary = bodyBlock.replace(/\r\n$/, '');
+      files[name] = {
+        filename: fileNameMatch[1],
+        contentType: mimeMatch ? mimeMatch[1].trim() : 'application/octet-stream',
+        buffer: Buffer.from(dataBinary, 'binary')
+      };
+    } else {
+      fields[name] = bodyBlock.replace(/\r\n$/, '');
+    }
+  }
+
+  return { fields, files };
 }
 
 function redirect(res, location) {
@@ -83,6 +124,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   req.session = getSession(req, res);
+  const settings = store.getSettings();
 
   const url = new URL(req.url, config.baseUrl);
   const pathname = url.pathname;
@@ -90,12 +132,12 @@ const server = http.createServer(async (req, res) => {
   try {
     if (req.method === 'GET' && pathname === '/') {
       const issues = store.listIssues({ tag: url.searchParams.get('tag') || '', status: url.searchParams.get('status') || 'open' });
-      sendHtml(res, homePage({ issues, tags: store.tags(), currentTag: url.searchParams.get('tag') || '', user: req.session.user, status: url.searchParams.get('status') || 'open' }));
+      sendHtml(res, homePage({ issues, tags: store.tags(), currentTag: url.searchParams.get('tag') || '', user: req.session.user, status: url.searchParams.get('status') || 'open', settings }));
       return;
     }
 
     if (req.method === 'GET' && pathname === '/login') {
-      sendHtml(res, loginPage(config.authMode, url.searchParams.get('error')));
+      sendHtml(res, loginPage(config.authMode, url.searchParams.get('error'), settings));
       return;
     }
 
@@ -129,7 +171,7 @@ const server = http.createServer(async (req, res) => {
         title: body.title?.trim(),
         description: body.description?.trim(),
         tags: (body.tags || '').split(',').map((t) => t.trim().toLowerCase()).filter(Boolean),
-        dueDate: body.dueDate || null,
+        expectedResolutionDate: body.expectedResolutionDate || null,
         isNew: Boolean(body.isNew),
         isHighImportance: Boolean(body.isHighImportance)
       }, req.session.user);
@@ -141,7 +183,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && detailsMatch) {
       const issueData = store.getIssue(detailsMatch[1]);
       if (!issueData) return sendHtml(res, '<h1>Not found</h1>', 404);
-      sendHtml(res, detailsPage({ ...issueData, user: req.session.user }));
+      sendHtml(res, detailsPage({ ...issueData, user: req.session.user, settings }));
       return;
     }
 
@@ -164,7 +206,34 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'GET' && pathname === '/admin') {
       if (!requireRole(req, res, ['admin'])) return;
-      sendHtml(res, adminPage({ issues: store.listIssues({ status: 'all' }), user: req.session.user }));
+      sendHtml(res, adminPage({ issues: store.listIssues({ status: 'all' }), user: req.session.user, settings }));
+      return;
+    }
+
+    if (req.method === 'POST' && pathname === '/admin/theme') {
+      if (!requireRole(req, res, ['admin'])) return;
+      const body = await readBody(req);
+      store.updateTheme({ headerBg: body.headerBg, pageBg: body.pageBg, accent: body.accent });
+      redirect(res, '/admin');
+      return;
+    }
+
+    if (req.method === 'POST' && pathname === '/admin/logo') {
+      if (!requireRole(req, res, ['admin'])) return;
+      const { files } = await readMultipart(req);
+      const logo = files.logo;
+      if (logo && logo.contentType.startsWith('image/') && logo.buffer.length <= 1024 * 1024) {
+        const dataUrl = `data:${logo.contentType};base64,${logo.buffer.toString('base64')}`;
+        store.setLogoDataUrl(dataUrl);
+      }
+      redirect(res, '/admin');
+      return;
+    }
+
+    if (req.method === 'POST' && pathname === '/admin/logo/clear') {
+      if (!requireRole(req, res, ['admin'])) return;
+      store.setLogoDataUrl('');
+      redirect(res, '/admin');
       return;
     }
 
@@ -176,6 +245,7 @@ const server = http.createServer(async (req, res) => {
         status: body.status === 'closed' ? 'closed' : 'open',
         isNew: Boolean(body.isNew),
         isHighImportance: Boolean(body.isHighImportance),
+        expectedResolutionDate: body.expectedResolutionDate || null,
         tags: (body.tags || '').split(',').map((t) => t.trim().toLowerCase()).filter(Boolean)
       });
       redirect(res, '/admin');

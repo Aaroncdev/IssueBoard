@@ -1,5 +1,13 @@
 {
   "issues": [],
   "comments": [],
-  "issueOrder": []
+  "issueOrder": [],
+  "settings": {
+    "logoDataUrl": "",
+    "theme": {
+      "headerBg": "#1f4a78",
+      "pageBg": "#f4f6f9",
+      "accent": "#1f4a78"
+    }
+  }
 }

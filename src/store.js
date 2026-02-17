@@ -6,6 +6,22 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+function isOverdue(issue) {
+  if (!issue.expectedResolutionDate || issue.status === 'closed') return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return new Date(issue.expectedResolutionDate) < today;
+}
+
+function withDerived(issue) {
+  const overdue = isOverdue(issue);
+  return {
+    ...issue,
+    isOverdue: overdue,
+    isHighImportance: issue.isHighImportance || overdue
+  };
+}
+
 class Store {
   constructor(filePath) {
     this.filePath = filePath;
@@ -16,13 +32,26 @@ class Store {
     const dir = path.dirname(this.filePath);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     if (!fs.existsSync(this.filePath)) {
-      const initial = { issues: [], comments: [], issueOrder: [] };
+      const initial = {
+        issues: [],
+        comments: [],
+        issueOrder: [],
+        settings: {
+          logoDataUrl: '',
+          theme: { headerBg: '#1f4a78', pageBg: '#f4f6f9', accent: '#1f4a78' }
+        }
+      };
       fs.writeFileSync(this.filePath, JSON.stringify(initial, null, 2));
     }
   }
 
   read() {
-    return JSON.parse(fs.readFileSync(this.filePath, 'utf8'));
+    const data = JSON.parse(fs.readFileSync(this.filePath, 'utf8'));
+    if (!data.settings) {
+      data.settings = { logoDataUrl: '', theme: { headerBg: '#1f4a78', pageBg: '#f4f6f9', accent: '#1f4a78' } };
+    }
+    if (!data.settings.theme) data.settings.theme = { headerBg: '#1f4a78', pageBg: '#f4f6f9', accent: '#1f4a78' };
+    return data;
   }
 
   write(data) {
@@ -32,12 +61,11 @@ class Store {
   listIssues(filters = {}) {
     const db = this.read();
     const activeOnly = filters.status !== 'all';
-    let issues = db.issues.filter((i) => (activeOnly ? i.status !== 'closed' : true));
+    let issues = db.issues.map(withDerived).filter((i) => (activeOnly ? i.status !== 'closed' : true));
     if (filters.tag) {
       issues = issues.filter((i) => i.tags.includes(filters.tag.toLowerCase()));
     }
-    const order = db.issueOrder;
-    const index = new Map(order.map((id, idx) => [id, idx]));
+    const index = new Map(db.issueOrder.map((id, idx) => [id, idx]));
     return issues.sort((a, b) => {
       if (a.isHighImportance !== b.isHighImportance) return a.isHighImportance ? -1 : 1;
       if (a.isNew !== b.isNew) return a.isNew ? -1 : 1;
@@ -55,7 +83,7 @@ class Store {
     const comments = db.comments
       .filter((c) => c.issueId === id)
       .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-    return { issue, comments };
+    return { issue: withDerived(issue), comments };
   }
 
   createIssue(payload, user) {
@@ -68,7 +96,7 @@ class Store {
       status: 'open',
       isNew: payload.isNew,
       isHighImportance: payload.isHighImportance,
-      dueDate: payload.dueDate || null,
+      expectedResolutionDate: payload.expectedResolutionDate || null,
       createdAt: nowIso(),
       updatedAt: nowIso(),
       createdBy: { id: user.id, name: user.name, email: user.email }
@@ -76,7 +104,7 @@ class Store {
     db.issues.push(issue);
     db.issueOrder.unshift(issue.id);
     this.write(db);
-    return issue;
+    return withDerived(issue);
   }
 
   updateIssue(id, updates) {
@@ -90,7 +118,7 @@ class Store {
       updatedAt: nowIso()
     };
     this.write(db);
-    return db.issues[idx];
+    return withDerived(db.issues[idx]);
   }
 
   closeIssue(id) {
@@ -126,6 +154,27 @@ class Store {
   tags() {
     const db = this.read();
     return [...new Set(db.issues.flatMap((i) => i.tags))].sort();
+  }
+
+  getSettings() {
+    return this.read().settings;
+  }
+
+  updateTheme(theme) {
+    const db = this.read();
+    db.settings.theme = {
+      ...db.settings.theme,
+      ...theme
+    };
+    this.write(db);
+    return db.settings;
+  }
+
+  setLogoDataUrl(logoDataUrl) {
+    const db = this.read();
+    db.settings.logoDataUrl = logoDataUrl;
+    this.write(db);
+    return db.settings;
   }
 }
 
