@@ -11,8 +11,8 @@ A lightweight internal web app for posting and tracking ICT known issues as card
 - Admin backend for metadata edits, status control, and manual sort order.
 
 ## Quick start
-1. Copy `.env.example` to `.env` and configure values.
-2. For local testing, set `AUTH_MODE=local`.
+1. Copy `.env.example` to `.env` in the application root (`/workspace/IssueBoard`) and configure values.
+2. For local testing, set `AUTH_MODE=local` (uppercase key; `auth_mode` is also accepted for compatibility).
 3. Start the app:
    ```bash
    node server.js

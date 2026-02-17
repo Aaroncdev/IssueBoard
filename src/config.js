@@ -5,13 +5,15 @@ function bool(v, fallback = false) {
   return ['1', 'true', 'yes', 'on'].includes(String(v).toLowerCase());
 }
 
+const authModeRaw = process.env.AUTH_MODE || process.env.auth_mode || 'azure';
+
 module.exports = {
   port: Number(process.env.PORT || 3000),
   baseUrl: process.env.BASE_URL || 'http://localhost:3000',
   sessionSecret: process.env.SESSION_SECRET || 'change-me-in-production',
   enforceHttps: bool(process.env.ENFORCE_HTTPS, false),
   dataFile: process.env.DATA_FILE || path.join(process.cwd(), 'data', 'issueboard.json'),
-  authMode: process.env.AUTH_MODE || 'azure', // azure | local
+  authMode: String(authModeRaw).toLowerCase() === 'local' ? 'local' : 'azure', // azure | local
   azure: {
     tenantId: process.env.AZURE_TENANT_ID || '',
     clientId: process.env.AZURE_CLIENT_ID || '',
