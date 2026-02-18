@@ -1,0 +1,11 @@
+{
+  "name": "issueboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Internal ICT issue notice board with Azure AD SSO",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node --check server.js && node --check src/auth.js && node --check src/store.js && node --check src/views.js"
+  }
+}
